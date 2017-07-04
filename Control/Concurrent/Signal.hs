@@ -23,10 +23,13 @@ module Control.Concurrent.Signal (
     newSignal,
     newStreamSignal,
     runSignal,
+    runStreamSignal,
     scanp,
     sampleOn,
     slift,
-    sliftinit
+    sliftinit,
+    isStreamSignal,
+    noSampleOn
     ) where
 
 import Control.Concurrent
@@ -58,7 +61,9 @@ stream2Signal (Stream x) = newSignal $ \f -> do
 
 runSignal :: Signal a -> (a -> IO ()) -> IO ()
 runSignal (Signal x) = x
-runSignal x@(Stream _) = runSignal . stream2Signal $ x
+
+runStreamSignal :: Signal a -> (a -> IO ()) -> IO ()
+runStreamSignal x = runSignal . stream2Signal $ x
 
 instance Functor Signal where
     fmap f (Signal s) = Signal $ \n -> s $ n . f
@@ -147,3 +152,13 @@ sliftinit :: IO a -> Signal a
 sliftinit f = Stream $ do
     x <- f
     return . return $ x
+
+isStreamSignal :: Signal a -> Bool
+isStreamSignal (Stream _) = True
+isStreamSignal _ = False
+
+noSampleOn :: Signal a -> Signal a
+noSampleOn (Signal f) = Stream $ do
+    r <- newIORef undefined
+    f $ atomicWriteIORef r
+    return $ readIORef r
